@@ -71,8 +71,10 @@ func (s *Server) setupRouter() {
 		// 根据文件扩展名设置正确的MIME类型
 		if strings.HasSuffix(filepath, ".js") {
 			c.Header("Content-Type", "application/javascript; charset=utf-8")
+			c.Header("Cache-Control", "public, max-age=31536000") // 1年缓存
 		} else if strings.HasSuffix(filepath, ".css") {
 			c.Header("Content-Type", "text/css; charset=utf-8")
+			c.Header("Cache-Control", "public, max-age=31536000") // 1年缓存
 		} else if strings.HasSuffix(filepath, ".map") {
 			c.Header("Content-Type", "application/json; charset=utf-8")
 		}
@@ -80,13 +82,22 @@ func (s *Server) setupRouter() {
 		c.File(fullPath)
 	})
 
-	// 其他静态文件（favicon.ico, outlook.svg等）
+	// 静态资源文件服务（favicon.ico, outlook.svg等）
+	s.router.GET("/favicon.ico", func(c *gin.Context) {
+		c.Header("Content-Type", "image/x-icon")
+		c.File("./backend/static/favicon.ico")
+	})
+
+	s.router.GET("/outlook.svg", func(c *gin.Context) {
+		c.Header("Content-Type", "image/svg+xml")
+		c.File("./backend/static/outlook.svg")
+	})
+
+	// 其他静态文件
 	s.router.Static("/static", "./backend/static")
 
-	// 根路径和其他路径都返回index.html（SPA路由支持）
+	// 根路径返回index.html
 	s.router.StaticFile("/", "./backend/static/index.html")
-	s.router.StaticFile("/favicon.ico", "./backend/static/favicon.ico")
-	s.router.StaticFile("/outlook.svg", "./backend/static/outlook.svg")
 
 	// API路由组
 	api := s.router.Group("/api")
@@ -151,9 +162,15 @@ func (s *Server) setupRouter() {
 		}
 	}
 
-	// 404处理
+	// 404处理 - 只对HTML页面请求返回index.html，其他返回404
 	s.router.NoRoute(func(c *gin.Context) {
-		c.File("./backend/static/index.html")
+		// 检查请求的Accept头部，如果是HTML请求则返回index.html
+		accept := c.GetHeader("Accept")
+		if strings.Contains(accept, "text/html") {
+			c.File("./backend/static/index.html")
+		} else {
+			c.JSON(404, gin.H{"error": "Not Found"})
+		}
 	})
 }
 
