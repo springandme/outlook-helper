@@ -7,14 +7,14 @@ WORKDIR /app/frontend
 # 复制前端依赖文件
 COPY frontend/package*.json ./
 
-# 安装前端依赖
-RUN npm ci --only=production
+# 安装前端依赖（包括开发依赖，因为构建需要）
+RUN npm ci
 
 # 复制前端源码
 COPY frontend/ ./
 
-# 构建前端
-RUN npm run build
+# 构建前端（直接运行vite build，避免run-p依赖问题）
+RUN npm run build-only
 
 # 阶段2: 构建后端
 FROM golang:1.23-alpine AS backend-builder
