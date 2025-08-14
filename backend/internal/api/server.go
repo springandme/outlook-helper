@@ -63,9 +63,30 @@ func (s *Server) setupRouter() {
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
 	s.router.Use(cors.New(corsConfig))
 
-	// 静态文件服务
+	// 静态文件服务 - 为assets目录设置正确的MIME类型
+	s.router.GET("/assets/*filepath", func(c *gin.Context) {
+		filepath := c.Param("filepath")
+		fullPath := "./backend/static/assets" + filepath
+
+		// 根据文件扩展名设置正确的MIME类型
+		if strings.HasSuffix(filepath, ".js") {
+			c.Header("Content-Type", "application/javascript; charset=utf-8")
+		} else if strings.HasSuffix(filepath, ".css") {
+			c.Header("Content-Type", "text/css; charset=utf-8")
+		} else if strings.HasSuffix(filepath, ".map") {
+			c.Header("Content-Type", "application/json; charset=utf-8")
+		}
+
+		c.File(fullPath)
+	})
+
+	// 其他静态文件（favicon.ico, outlook.svg等）
 	s.router.Static("/static", "./backend/static")
+
+	// 根路径和其他路径都返回index.html（SPA路由支持）
 	s.router.StaticFile("/", "./backend/static/index.html")
+	s.router.StaticFile("/favicon.ico", "./backend/static/favicon.ico")
+	s.router.StaticFile("/outlook.svg", "./backend/static/outlook.svg")
 
 	// API路由组
 	api := s.router.Group("/api")
