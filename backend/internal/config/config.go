@@ -72,7 +72,7 @@ func Load() (*Config, error) {
 		OutlookAPI:             outlookAPI,
 		LogLevel:               getEnv("LOG_LEVEL", "info"),
 		LogFile:                getEnv("LOG_FILE", "./logs/app.log"),
-		CORSOrigins:            getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
+		CORSOrigins:            getEnv("CORS_ALLOWED_ORIGINS", ""),
 		SkipEmailValidation:    getEnvAsBool("SKIP_EMAIL_VALIDATION", false),
 		EmailValidationWorkers: getEnvAsInt("EMAIL_VALIDATION_WORKERS", 5),
 		AuthToken:              authToken,

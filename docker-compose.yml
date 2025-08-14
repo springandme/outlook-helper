@@ -15,6 +15,8 @@ services:
       - OUTLOOK_API_BASE_URL=https://your-outlook-api-domain.vercel.app
       - LOG_LEVEL=info
       - LOG_FILE=./logs/app.log
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
     volumes:
       - outlook_data:/app/data
       - outlook_logs:/app/logs
