@@ -65,10 +65,6 @@ backend/cmd/main
 backend/cmd/data/
 backend/static/
 
-# Scripts (except verify-build.sh which is needed in Docker)
-scripts/build-docker.sh
-scripts/test-deployment.sh
-
 # Go
 *.exe
 *.exe~

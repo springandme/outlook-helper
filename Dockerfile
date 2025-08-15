@@ -13,29 +13,48 @@ RUN npm ci --no-audit --no-fund
 # 显示npm和node版本信息
 RUN node --version && npm --version
 
-# 复制前端源码和构建脚本
+# 复制前端源码
 COPY frontend/ ./
-COPY scripts/verify-build.sh ./
+
+# 接受构建参数
+ARG VITE_API_BASE_URL=/api
+ARG VITE_APP_TITLE=Outlook取件助手
+ARG VITE_APP_VERSION=1.0.0
 
 # 设置前端构建环境变量
 ENV NODE_ENV=production
-ENV VITE_API_BASE_URL=/api
-ENV VITE_APP_TITLE=Outlook取件助手
-ENV VITE_APP_VERSION=1.0.0
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_APP_TITLE=$VITE_APP_TITLE
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
 
 # 显示环境变量（用于调试）
-RUN echo "构建环境变量:" && \
+RUN echo "🔧 构建环境变量:" && \
     echo "NODE_ENV=$NODE_ENV" && \
     echo "VITE_API_BASE_URL=$VITE_API_BASE_URL" && \
     echo "VITE_APP_TITLE=$VITE_APP_TITLE"
 
 # 清理可能的缓存并构建前端
-RUN npm cache clean --force && \
+RUN echo "🧹 清理缓存..." && \
+    npm cache clean --force && \
     rm -rf node_modules/.cache dist && \
+    echo "🔨 开始构建前端..." && \
     npm run build-only
 
-# 验证构建结果
-RUN chmod +x verify-build.sh && ./verify-build.sh
+# 内嵌验证构建结果
+RUN echo "🔍 验证构建结果..." && \
+    # 检查dist目录是否存在 \
+    if [ ! -d "dist" ]; then echo "❌ 错误：dist目录不存在"; exit 1; fi && \
+    # 检查index.html是否存在 \
+    if [ ! -f "dist/index.html" ]; then echo "❌ 错误：index.html文件不存在"; exit 1; fi && \
+    # 检查是否有JS文件 \
+    if [ $(find dist -name "*.js" | wc -l) -eq 0 ]; then echo "❌ 错误：没有找到JS文件"; exit 1; fi && \
+    # 检查JS文件中是否包含硬编码的localhost:8080 \
+    if grep -r "localhost:8080" dist/ 2>/dev/null; then echo "❌ 错误：发现硬编码的localhost:8080"; exit 1; fi && \
+    # 显示构建产物信息 \
+    echo "✅ 构建验证通过！" && \
+    echo "📦 构建产物大小: $(du -sh dist | cut -f1)" && \
+    echo "📁 主要文件:" && \
+    ls -la dist/
 
 # 阶段2: 构建后端
 FROM golang:1.23-alpine AS backend-builder
