@@ -8,13 +8,34 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # 安装前端依赖（包括开发依赖，因为构建需要）
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
-# 复制前端源码
+# 显示npm和node版本信息
+RUN node --version && npm --version
+
+# 复制前端源码和构建脚本
 COPY frontend/ ./
+COPY scripts/verify-build.sh ./
 
-# 构建前端（直接运行vite build，避免run-p依赖问题）
-RUN npm run build-only
+# 设置前端构建环境变量
+ENV NODE_ENV=production
+ENV VITE_API_BASE_URL=/api
+ENV VITE_APP_TITLE=Outlook取件助手
+ENV VITE_APP_VERSION=1.0.0
+
+# 显示环境变量（用于调试）
+RUN echo "构建环境变量:" && \
+    echo "NODE_ENV=$NODE_ENV" && \
+    echo "VITE_API_BASE_URL=$VITE_API_BASE_URL" && \
+    echo "VITE_APP_TITLE=$VITE_APP_TITLE"
+
+# 清理可能的缓存并构建前端
+RUN npm cache clean --force && \
+    rm -rf node_modules/.cache dist && \
+    npm run build-only
+
+# 验证构建结果
+RUN chmod +x verify-build.sh && ./verify-build.sh
 
 # 阶段2: 构建后端
 FROM golang:1.23-alpine AS backend-builder
