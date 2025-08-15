@@ -98,11 +98,23 @@ func (s *OutlookService) GetLatestMail(email *models.Email, mailbox string, resp
 		return nil, fmt.Errorf("API请求失败，状态码: %d, 响应: %s", resp.StatusCode, string(body))
 	}
 
-	// 直接解析邮件数据（API直接返回邮件对象，不包装在通用响应中）
+	// 尝试解析邮件数据，支持两种格式：单个对象或数组
 	var mailData map[string]interface{}
+
+	// 首先尝试解析为单个对象
 	if err := json.Unmarshal(body, &mailData); err != nil {
-		// 记录完整的响应内容以便调试
-		return nil, fmt.Errorf("解析响应失败: %v, 响应内容: %s", err, string(body))
+		// 如果失败，尝试解析为数组格式
+		var mailsArray []map[string]interface{}
+		if arrayErr := json.Unmarshal(body, &mailsArray); arrayErr != nil {
+			// 两种格式都解析失败，记录完整的响应内容
+			return nil, fmt.Errorf("解析响应失败: %v, 响应内容: %s", err, string(body))
+		}
+
+		// 如果是数组格式，取第一个元素作为最新邮件
+		if len(mailsArray) == 0 {
+			return nil, fmt.Errorf("API返回空邮件数组")
+		}
+		mailData = mailsArray[0]
 	}
 
 	// 解析时间字段
