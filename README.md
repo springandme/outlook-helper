@@ -111,9 +111,8 @@ go run backend/cmd/main.go
 ```
 
 ### 默认访问信息
-- **访问地址**: http://localhost:8080
+- **访问地址**: http://ip:8080
 - **登录方式**: 使用配置的AUTH_TOKEN授权码登录
-- **API文档**: http://localhost:8080/api/health
 
 ## 🐳 Docker部署
 
@@ -144,17 +143,7 @@ docker run -d \
   -v outlook_logs:/app/logs \
   -e AUTH_TOKEN=your-super-secret-auth-token \
   -e OUTLOOK_API_BASE_URL=https://your-outlook-api-domain.vercel.app \
-  outlook-helper
-
-# 或者使用本地目录挂载（推荐用于生产环境）
-docker run -d \
-  --name outlook-helper \
-  -p 8080:8080 \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/logs:/app/logs \
-  -e AUTH_TOKEN=your-super-secret-auth-token \
-  -e OUTLOOK_API_BASE_URL=https://your-outlook-api-domain.vercel.app \
-  outlook-helper
+  linqiu1199/outlook-helper:latest
 ```
 
 > ⚠️ **重要提醒**：SQLite数据库文件存储在 `/app/data` 目录中，必须挂载数据卷或本地目录，否则容器重启会导致所有数据丢失！
