@@ -19,7 +19,6 @@ type Config struct {
 	OutlookAPI             string
 	LogLevel               string
 	LogFile                string
-	CORSOrigins            string
 	SkipEmailValidation    bool   // 是否跳过邮箱验证（调试用）
 	EmailValidationWorkers int    // 邮箱验证并发数
 	AuthToken              string // 授权码（必须配置）
@@ -72,7 +71,6 @@ func Load() (*Config, error) {
 		OutlookAPI:             outlookAPI,
 		LogLevel:               getEnv("LOG_LEVEL", "info"),
 		LogFile:                getEnv("LOG_FILE", "./logs/app.log"),
-		CORSOrigins:            getEnv("CORS_ALLOWED_ORIGINS", ""),
 		SkipEmailValidation:    getEnvAsBool("SKIP_EMAIL_VALIDATION", false),
 		EmailValidationWorkers: getEnvAsInt("EMAIL_VALIDATION_WORKERS", 5),
 		AuthToken:              authToken,

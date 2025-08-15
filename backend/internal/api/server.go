@@ -56,14 +56,9 @@ func (s *Server) setupRouter() {
 
 	s.router = gin.Default()
 
-	// 配置CORS
+	// 配置CORS - 允许所有来源访问
 	corsConfig := cors.DefaultConfig()
-	if s.config.CORSOrigins == "" {
-		// 如果没有配置CORS来源，则允许所有来源
-		corsConfig.AllowAllOrigins = true
-	} else {
-		corsConfig.AllowOrigins = strings.Split(s.config.CORSOrigins, ",")
-	}
+	corsConfig.AllowAllOrigins = true
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
 	s.router.Use(cors.New(corsConfig))
