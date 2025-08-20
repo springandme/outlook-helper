@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    title="批量标签邮箱"
+    title="添加邮箱标签"
     width="400px"
     :before-close="handleClose"
   >

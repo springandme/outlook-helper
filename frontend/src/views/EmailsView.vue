@@ -18,14 +18,6 @@
         </div>
         <div class="operation-right">
           <el-button
-            type="warning"
-            :disabled="selectedEmails.length === 0"
-            @click="showBatchTagDialog = true"
-          >
-            <el-icon><Collection /></el-icon>
-            标签邮件
-          </el-button>
-          <el-button
             type="danger"
             :disabled="selectedEmails.length === 0 || operationLoading.batchClearInbox"
             :loading="operationLoading.batchClearInbox"
@@ -65,7 +57,7 @@
     </el-card>
 
     <!-- 邮箱列表 -->
-    <el-card class="table-card">
+    <el-card class="table-card" v-loading="pageLoading" :element-loading-text="pageLoadingText">
       <el-table
         v-loading="loading"
         :data="emails"
@@ -77,9 +69,9 @@
           <template #default="{ row }">
             <div class="email-address-cell">
               <span
-                class="email-address-text"
+                class="email-address-link"
                 @click="handleEmailClick(row)"
-                :title="点击标记邮箱"
+                title="点击标记邮箱"
               >
                 {{ row.email_address }}
               </span>
@@ -132,38 +124,37 @@
               {{ row.last_operation_at ? formatTime(row.last_operation_at) : '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="320" fixed="right">
+          <el-table-column label="操作" width="150" fixed="right">
             <template #default="{ row }">
               <div class="operation-buttons">
                 <el-button
-                  size="small"
-                  type="primary"
+                  link
+                  class="icon-button icon-button-primary"
                   :loading="operationLoading.getLatestMail[row.id]"
                   :disabled="operationLoading.getLatestMail[row.id]"
                   @click="getLatestMail(row)"
                 >
-                  <el-icon><Message /></el-icon>
-                  最新邮件
+                  <el-icon :size="18"><Bell /></el-icon>
                 </el-button>
+
                 <el-button
-                  size="small"
-                  type="info"
+                  link
+                  class="icon-button icon-button-info"
                   :loading="operationLoading.getAllMails[row.id]"
                   :disabled="operationLoading.getAllMails[row.id]"
                   @click="getAllMails(row)"
                 >
-                  <el-icon><Folder /></el-icon>
-                  全部邮件
+                  <el-icon :size="18"><Grid /></el-icon>
                 </el-button>
+
                 <el-button
-                  size="small"
-                  type="danger"
+                  link
+                  class="icon-button icon-button-danger"
                   :loading="operationLoading.deleteEmail[row.id]"
                   :disabled="operationLoading.deleteEmail[row.id]"
                   @click="deleteEmail(row)"
                 >
-                  <el-icon><Delete /></el-icon>
-                  删除邮箱
+                  <el-icon :size="18"><Close /></el-icon>
                 </el-button>
               </div>
             </template>
@@ -230,10 +221,17 @@ import {
   Refresh,
   Message,
   Folder,
+  Files,
   Delete,
+  DeleteFilled,
   ArrowDown,
   Collection,
-  CopyDocument
+  CopyDocument,
+  Promotion,
+  FolderOpened,
+  Bell,
+  Grid,
+  Close
 } from '@element-plus/icons-vue'
 import AddEmailDialog from '@/components/AddEmailDialog.vue'
 import BatchAddDialog from '@/components/BatchAddDialog.vue'
@@ -266,6 +264,10 @@ const showBatchDialog = ref(false)
 const showBatchTagDialog = ref(false)
 const showMailDialog = ref(false)
 const showImportDialog = ref(false)
+
+// 全页面加载遮罩
+const pageLoading = ref(false)
+const pageLoadingText = ref('加载中...')
 
 // 邮件相关
 const currentMail = ref<OutlookMail | null>(null)
@@ -338,6 +340,8 @@ const copyEmailAddress = async (emailAddress: string) => {
 
 const getLatestMail = async (email: Email) => {
   operationLoading.value.getLatestMail[email.id] = true
+  pageLoading.value = true
+  pageLoadingText.value = '正在获取最新邮件...'
   try {
     const response = await emailAPI.getLatestMail(email.id)
     if (response.data.success && response.data.data) {
@@ -345,17 +349,31 @@ const getLatestMail = async (email: Email) => {
       currentMailList.value = [response.data.data]
       showMailDialog.value = true
     } else {
-      ElMessage.error(response.data.message || '获取邮件失败')
+      // 检查是否是"Nothing to fetch"错误
+      if (response.data.error && response.data.error.includes('Nothing to fetch')) {
+        ElMessage.info('当前邮箱暂无邮件')
+      } else {
+        ElMessage.error(response.data.message || '获取邮件失败')
+      }
     }
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '获取邮件失败')
+    // 检查错误响应中是否包含"Nothing to fetch"
+    const errorMessage = error.response?.data?.error || error.response?.data?.message || ''
+    if (errorMessage.includes('Nothing to fetch')) {
+      ElMessage.info('当前邮箱暂无邮件')
+    } else {
+      ElMessage.error(error.response?.data?.message || '获取邮件失败')
+    }
   } finally {
     operationLoading.value.getLatestMail[email.id] = false
+    pageLoading.value = false
   }
 }
 
 const getAllMails = async (email: Email) => {
   operationLoading.value.getAllMails[email.id] = true
+  pageLoading.value = true
+  pageLoadingText.value = '正在获取全部邮件...'
   try {
     const response = await emailAPI.getAllMails(email.id)
     if (response.data.success && response.data.data) {
@@ -363,12 +381,24 @@ const getAllMails = async (email: Email) => {
       currentMail.value = response.data.data[0] || null
       showMailDialog.value = true
     } else {
-      ElMessage.error(response.data.message || '获取邮件失败')
+      // 检查是否是"Nothing to fetch"错误
+      if (response.data.error && response.data.error.includes('Nothing to fetch')) {
+        ElMessage.info('当前邮箱暂无邮件')
+      } else {
+        ElMessage.error(response.data.message || '获取邮件失败')
+      }
     }
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '获取邮件失败')
+    // 检查错误响应中是否包含"Nothing to fetch"
+    const errorMessage = error.response?.data?.error || error.response?.data?.message || ''
+    if (errorMessage.includes('Nothing to fetch')) {
+      ElMessage.info('当前邮箱暂无邮件')
+    } else {
+      ElMessage.error(error.response?.data?.message || '获取邮件失败')
+    }
   } finally {
     operationLoading.value.getAllMails[email.id] = false
+    pageLoading.value = false
   }
 }
 
@@ -462,6 +492,8 @@ const deleteEmail = async (email: Email) => {
     )
 
     operationLoading.value.deleteEmail[email.id] = true
+    pageLoading.value = true
+    pageLoadingText.value = '正在删除邮箱...'
     const response = await emailAPI.deleteEmail(email.id)
     if (response.data.success) {
       ElMessage.success('删除成功')
@@ -475,6 +507,7 @@ const deleteEmail = async (email: Email) => {
     }
   } finally {
     operationLoading.value.deleteEmail[email.id] = false
+    pageLoading.value = false
   }
 }
 
@@ -580,13 +613,30 @@ onMounted(() => {
 
 .tags-container {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 2px;
+  overflow: hidden;
+  align-items: center;
 }
 
 .tag-item {
   color: white;
   border: none;
+  height: 22px;
+  line-height: 20px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+
+.tags-container .el-tag {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  height: 22px;
+  line-height: 20px;
+  padding: 0 7px;
+  font-size: 12px;
 }
 
 .no-tags {
@@ -596,15 +646,21 @@ onMounted(() => {
 
 
 :deep(.el-table .cell) {
-  padding: 12px 8px;
+  padding: 4px 8px;
+  font-size: 14px;
 }
 
 :deep(.el-table td) {
-  height: 60px;
+  height: 36px;
 }
 
 :deep(.el-table th) {
-  height: 50px;
+  height: 40px;
+  padding: 8px 0;
+}
+
+:deep(.el-table .el-table__row) {
+  height: 36px;
 }
 
 :deep(.el-button-group .el-button) {
@@ -613,12 +669,90 @@ onMounted(() => {
 
 .operation-buttons {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  height: 28px;
 }
 
 .operation-buttons .el-button {
   margin: 0;
+}
+
+.operation-buttons .icon-button {
+  padding: 3px;
+  border-radius: 4px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  position: relative;
+  border: 1px solid transparent;
+  height: 26px;
+  width: 26px;
+}
+
+.operation-buttons .icon-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.operation-buttons .icon-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* 主要操作按钮 - 最新邮件（紫色） */
+.operation-buttons .icon-button-primary .el-icon {
+  color: #9c27b0;
+}
+
+.operation-buttons .icon-button-primary:hover {
+  background: rgba(156, 39, 176, 0.1);
+  border-color: rgba(156, 39, 176, 0.2);
+}
+
+.operation-buttons .icon-button-primary:hover .el-icon {
+  color: #7b1fa2;
+}
+
+/* 信息操作按钮 - 全部邮件（黑色） */
+.operation-buttons .icon-button-info .el-icon {
+  color: #303133;
+}
+
+.operation-buttons .icon-button-info:hover {
+  background: rgba(48, 49, 51, 0.08);
+  border-color: rgba(48, 49, 51, 0.15);
+}
+
+.operation-buttons .icon-button-info:hover .el-icon {
+  color: #000000;
+}
+
+/* 危险操作按钮 - 删除 */
+.operation-buttons .icon-button-danger .el-icon {
+  color: #f56c6c;
+}
+
+.operation-buttons .icon-button-danger:hover {
+  background: rgba(245, 108, 108, 0.1);
+  border-color: rgba(245, 108, 108, 0.2);
+}
+
+.operation-buttons .icon-button-danger:hover .el-icon {
+  color: #f23c3c;
+}
+
+/* 禁用状态 */
+.operation-buttons .icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.operation-buttons .icon-button:disabled:hover {
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+  border-color: transparent;
 }
 
 .email-address-cell {
@@ -627,9 +761,10 @@ onMounted(() => {
   width: 100%;
   white-space: nowrap;
   overflow: hidden;
+  height: 28px;
 }
 
-.email-address-text {
+.email-address-link {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -637,30 +772,32 @@ onMounted(() => {
   color: #409eff;
   transition: all 0.2s ease;
   padding: 2px 4px;
-  border-radius: 3px;
+  border-radius: 2px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
-.email-address-text:hover {
+.email-address-link:hover {
   background-color: #f0f9ff;
   color: #66b1ff;
   text-decoration: underline;
 }
 
-.email-address-text:active {
+.email-address-link:active {
   background-color: #e6f7ff;
   color: #409eff;
 }
 
 .copy-button {
-  margin-left: 6px;
-  padding: 2px;
+  margin-left: 4px;
+  padding: 1px;
   opacity: 0.6;
   transition: all 0.2s ease;
-  border-radius: 3px;
+  border-radius: 2px;
   background: transparent;
   min-height: auto;
-  height: 18px;
-  width: 18px;
+  height: 16px;
+  width: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -689,16 +826,48 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+/* 自定义加载遮罩样式 - 仅限于卡片区域 */
+.table-card :deep(.el-loading-mask) {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(3px);
+  transition: opacity 0.3s ease;
+  border-radius: 4px;
+}
+
+.table-card :deep(.el-loading-spinner) {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.table-card :deep(.el-loading-spinner .el-loading-text) {
+  color: #409eff;
+  font-size: 14px;
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+.table-card :deep(.el-loading-spinner .circular) {
+  width: 42px;
+  height: 42px;
+  animation: loading-rotate 2s linear infinite;
+}
+
+@keyframes loading-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 768px) {
   .operation-bar {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .operation-right {
     justify-content: space-between;
   }
-  
+
   .operation-right .el-input {
     flex: 1;
     margin-right: 12px;
