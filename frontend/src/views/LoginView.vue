@@ -22,6 +22,7 @@
         :model="loginForm"
         :rules="loginRules"
         class="login-form"
+        :class="{ 'shake-animation': isShaking }"
         @submit.prevent="handleLogin"
       >
         <el-form-item prop="auth_token">
@@ -71,12 +72,21 @@ const loginFormRef = ref<FormInstance>()
 const loginForm = reactive<LoginRequest>({
   auth_token: ''
 })
+const isShaking = ref(false)
 
 const loginRules: FormRules = {
   auth_token: [
     { required: true, message: '请输入授权码', trigger: 'blur' },
     { min: 8, max: 100, message: '授权码长度在 8 到 100 个字符', trigger: 'blur' }
   ]
+}
+
+// 触发抖动动画
+const triggerShake = () => {
+  isShaking.value = true
+  setTimeout(() => {
+    isShaking.value = false
+  }, 500)
 }
 
 const handleLogin = async () => {
@@ -88,15 +98,26 @@ const handleLogin = async () => {
 
     const success = await authStore.login(loginForm)
     if (success) {
-      console.log('Login successful, navigating to dashboard...')
+      // 登录成功后跳转
       try {
         await router.push('/')
-        console.log('Navigation successful')
       } catch (navError) {
         console.error('Navigation error:', navError)
         // 如果路由跳转失败，尝试直接跳转到仪表盘
         window.location.href = '/'
       }
+    } else {
+      // 登录失败时，触发抖动效果
+      triggerShake()
+      // 清空密码框并聚焦
+      loginForm.auth_token = ''
+      // 延迟一下再聚焦，确保DOM更新
+      setTimeout(() => {
+        const inputEl = document.querySelector('.el-input__inner') as HTMLInputElement
+        if (inputEl) {
+          inputEl.focus()
+        }
+      }, 100)
     }
   } catch (error) {
     console.error('Login validation error:', error)
@@ -194,5 +215,27 @@ onMounted(() => {
 
 :deep(.el-button) {
   border-radius: 8px;
+}
+
+/* 抖动动画 */
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-10px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(10px);
+  }
+}
+
+.shake-animation {
+  animation: shake 0.5s;
+}
+
+/* 错误状态的输入框样式 */
+.shake-animation :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
 }
 </style>

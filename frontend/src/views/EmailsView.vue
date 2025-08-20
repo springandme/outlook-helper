@@ -76,7 +76,13 @@
         <el-table-column prop="email_address" label="邮箱地址" width="320">
           <template #default="{ row }">
             <div class="email-address-cell">
-              {{ row.email_address }}
+              <span
+                class="email-address-text"
+                @click="handleEmailClick(row)"
+                :title="点击标记邮箱"
+              >
+                {{ row.email_address }}
+              </span>
               <el-button
                 size="small"
                 type="text"
@@ -105,9 +111,15 @@
             <span v-else class="no-tags">-</span>
             </template>
           </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="130">
+        <el-table-column prop="remark" label="备注" width="100">
           <template #default="{ row }">
-            {{ row.remark || '-' }}
+            <el-tooltip
+              :content="row.remark || '无备注'"
+              placement="top"
+              :disabled="!row.remark || row.remark.length <= 10"
+            >
+              <span class="remark-text">{{ row.remark || '-' }}</span>
+            </el-tooltip>
           </template>
         </el-table-column>
           <el-table-column prop="created_at" label="添加时间" width="160">
@@ -508,6 +520,13 @@ const handleBatchTagSuccess = () => {
   loadEmails()
 }
 
+const handleEmailClick = (email: Email) => {
+  // 设置选中的邮箱为当前点击的邮箱
+  selectedEmails.value = [email]
+  // 打开批量标签对话框
+  showBatchTagDialog.value = true
+}
+
 const formatTime = (timeStr: string): string => {
   return new Date(timeStr).toLocaleString('zh-CN')
 }
@@ -603,11 +622,33 @@ onMounted(() => {
 }
 
 .email-address-cell {
-  display: inline-block;
+  display: flex;
+  align-items: center;
   width: 100%;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.email-address-text {
+  flex: 1;
+  overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  color: #409eff;
+  transition: all 0.2s ease;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.email-address-text:hover {
+  background-color: #f0f9ff;
+  color: #66b1ff;
+  text-decoration: underline;
+}
+
+.email-address-text:active {
+  background-color: #e6f7ff;
+  color: #409eff;
 }
 
 .copy-button {
@@ -624,6 +665,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .copy-button:hover {
@@ -637,6 +679,14 @@ onMounted(() => {
 .copy-button:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.remark-text {
+  display: inline-block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {

@@ -33,8 +33,30 @@ export const useAuthStore = defineStore('auth', () => {
         return false
       }
     } catch (error: any) {
-      const message = error.response?.data?.message || '登录失败，请检查网络连接'
-      ElMessage.error(message)
+      // 处理不同的错误状态
+      let message = '登录失败，请检查网络连接'
+
+      if (error.response) {
+        // 服务器返回了错误响应
+        if (error.response.status === 401) {
+          message = '授权码错误，请检查输入的授权码是否正确'
+        } else if (error.response.status === 403) {
+          message = '访问被拒绝'
+        } else if (error.response.status === 500) {
+          message = '服务器错误，请稍后重试'
+        } else if (error.response.data?.message) {
+          message = error.response.data.message
+        }
+      } else if (error.request) {
+        // 请求已发送但没有收到响应
+        message = '无法连接到服务器，请检查网络连接'
+      }
+
+      ElMessage.error({
+        message,
+        duration: 3000,
+        showClose: true
+      })
       return false
     } finally {
       isLoading.value = false

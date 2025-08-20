@@ -35,10 +35,15 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // 清除token并跳转到登录页
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('user_info')
-      window.location.href = '/login'
+      // 如果当前已经在登录页，不要重定向
+      const currentPath = window.location.pathname
+      if (currentPath !== '/login') {
+        // 清除token并跳转到登录页
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_info')
+        window.location.href = '/login'
+      }
+      // 在登录页面时，让错误继续传递，以便显示错误消息
     }
     return Promise.reject(error)
   }
