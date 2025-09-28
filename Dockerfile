@@ -27,6 +27,8 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_APP_TITLE=$VITE_APP_TITLE
 ENV VITE_APP_VERSION=$VITE_APP_VERSION
 
+# 构建前端应用
+RUN npm run build-only
 
 # 阶段2: 构建后端
 FROM golang:1.23-alpine AS backend-builder
