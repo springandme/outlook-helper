@@ -48,6 +48,10 @@
             <el-icon><Document /></el-icon>
             导入文件
           </el-button>
+          <el-button @click="showExportDialog = true">
+            <el-icon><Download /></el-icon>
+            导出
+          </el-button>
           <el-button @click="loadEmails">
             <el-icon><Refresh /></el-icon>
             刷新
@@ -207,6 +211,14 @@
       v-model="showImportDialog"
       @success="handleImportSuccess"
     />
+
+    <!-- 导出对话框 -->
+    <ExportDialog
+      v-model="showExportDialog"
+      :selected-count="selectedEmails.length"
+      :selected-email-ids="selectedEmails.map(e => e.id)"
+      @export="handleExport"
+    />
   </div>
 </template>
 
@@ -231,13 +243,15 @@ import {
   FolderOpened,
   Bell,
   Grid,
-  Close
+  Close,
+  Download
 } from '@element-plus/icons-vue'
 import AddEmailDialog from '@/components/AddEmailDialog.vue'
 import BatchAddDialog from '@/components/BatchAddDialog.vue'
 import BatchTagDialog from '@/components/BatchTagDialog.vue'
 import MailViewDialog from '@/components/MailViewDialog.vue'
 import FileImportDialog from '@/components/FileImportDialog.vue'
+import ExportDialog from '@/components/ExportDialog.vue'
 import { emailAPI, type Email, type OutlookMail } from '@/api'
 
 // 响应式数据
@@ -264,6 +278,7 @@ const showBatchDialog = ref(false)
 const showBatchTagDialog = ref(false)
 const showMailDialog = ref(false)
 const showImportDialog = ref(false)
+const showExportDialog = ref(false)
 
 // 全页面加载遮罩
 const pageLoading = ref(false)
@@ -320,6 +335,47 @@ const handleCurrentChange = (page: number) => {
 
 const handleImportSuccess = () => {
   loadEmails()
+}
+
+const handleExport = async (params: any) => {
+  try {
+    const exportParams = {
+      range: params.range,
+      format: params.format,
+      sort_field: params.sortField,
+      sort_direction: params.sortDirection,
+      email_ids: params.emailIds
+    }
+
+    const response = await emailAPI.exportEmails(exportParams)
+
+    if (response.data.success) {
+      // 创建下载链接
+      const blob = new Blob([response.data.data.content], {
+        type: params.format === 'csv' ? 'text/csv' : 'text/plain'
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+
+      // 设置文件名
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-')
+      const extension = params.format === 'csv' ? 'csv' : 'txt'
+      link.download = `outlook_emails_${timestamp}.${extension}`
+
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      ElMessage.success(`成功导出 ${response.data.data.count} 个邮箱`)
+    } else {
+      ElMessage.error(response.data.message || '导出失败')
+    }
+  } catch (error: any) {
+    console.error('导出失败:', error)
+    ElMessage.error(error.response?.data?.message || '导出失败，请重试')
+  }
 }
 
 const copyEmailAddress = async (emailAddress: string) => {

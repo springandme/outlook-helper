@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strings"
 
 	"outlook-helper/backend/internal/models"
 )
@@ -390,4 +391,115 @@ func (r *EmailRepository) EmailExists(userID int, emailAddress string) (bool, er
 	}
 
 	return count > 0, nil
+}
+
+// GetEmailsByIDs 根据ID列表获取邮箱（用于导出选中的邮箱）
+func (r *EmailRepository) GetEmailsByIDs(userID int, emailIDs []int) ([]models.Email, error) {
+	if len(emailIDs) == 0 {
+		return []models.Email{}, nil
+	}
+
+	// 构建占位符字符串
+	placeholders := make([]string, len(emailIDs))
+	args := make([]interface{}, len(emailIDs)+1)
+	args[0] = userID
+
+	for i, id := range emailIDs {
+		placeholders[i] = "?"
+		args[i+1] = id
+	}
+
+	query := `
+		SELECT id, user_id, email_address, password, client_id, refresh_token, remark,
+		       last_operation_at, created_at, updated_at
+		FROM emails
+		WHERE user_id = ? AND id IN (` + strings.Join(placeholders, ",") + `)
+		ORDER BY id
+	`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var emails []models.Email
+	for rows.Next() {
+		var email models.Email
+		err := rows.Scan(
+			&email.ID,
+			&email.UserID,
+			&email.EmailAddress,
+			&email.Password,
+			&email.ClientID,
+			&email.RefreshToken,
+			&email.Remark,
+			&email.LastOperationAt,
+			&email.CreatedAt,
+			&email.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		emails = append(emails, email)
+	}
+
+	return emails, rows.Err()
+}
+
+// GetEmailsForExport 获取用于导出的邮箱数据（支持排序）
+func (r *EmailRepository) GetEmailsForExport(userID int, sortField, sortDirection string) ([]models.Email, error) {
+	// 验证排序字段
+	validSortFields := map[string]bool{
+		"email_address": true,
+		"password":      true,
+		"refresh_token": true,
+		"client_id":     true,
+		"created_at":    true,
+	}
+
+	if !validSortFields[sortField] {
+		sortField = "email_address" // 默认排序字段
+	}
+
+	// 验证排序方向
+	if sortDirection != "asc" && sortDirection != "desc" {
+		sortDirection = "asc" // 默认排序方向
+	}
+
+	query := `
+		SELECT id, user_id, email_address, password, client_id, refresh_token, remark,
+		       last_operation_at, created_at, updated_at
+		FROM emails
+		WHERE user_id = ?
+		ORDER BY ` + sortField + ` ` + sortDirection
+
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var emails []models.Email
+	for rows.Next() {
+		var email models.Email
+		err := rows.Scan(
+			&email.ID,
+			&email.UserID,
+			&email.EmailAddress,
+			&email.Password,
+			&email.ClientID,
+			&email.RefreshToken,
+			&email.Remark,
+			&email.LastOperationAt,
+			&email.CreatedAt,
+			&email.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		emails = append(emails, email)
+	}
+
+	return emails, rows.Err()
 }

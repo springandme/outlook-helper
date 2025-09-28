@@ -3,6 +3,8 @@ package services
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	"outlook-helper/backend/internal/config"
 	"outlook-helper/backend/internal/database"
@@ -451,4 +453,134 @@ func (s *EmailService) CountUserEmails(userID int) (int, error) {
 // CountSearchEmails 统计搜索结果数量
 func (s *EmailService) CountSearchEmails(userID int, keyword string) (int, error) {
 	return s.emailRepo.CountSearchEmails(userID, keyword)
+}
+
+// ExportEmails 导出邮箱数据
+func (s *EmailService) ExportEmails(userID int, req *models.ExportEmailRequest, ipAddress, userAgent string) (*models.ExportEmailResponse, error) {
+	var emails []models.Email
+	var err error
+
+	// 根据导出范围获取邮箱数据
+	if req.Range == "selected" {
+		if len(req.EmailIDs) == 0 {
+			return nil, errors.New("选择导出时必须提供邮箱ID列表")
+		}
+
+		// 验证所有邮箱都属于当前用户并获取数据
+		emails, err = s.emailRepo.GetEmailsByIDs(userID, req.EmailIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		// 验证数量匹配，确保所有请求的邮箱都存在且属于当前用户
+		if len(emails) != len(req.EmailIDs) {
+			return nil, errors.New("部分邮箱不存在或无权访问")
+		}
+	} else {
+		// 导出全部邮箱
+		emails, err = s.emailRepo.GetEmailsForExport(userID, req.SortField, req.SortDirection)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// 如果是选中的邮箱，需要根据排序字段和方向重新排序
+	if req.Range == "selected" && len(emails) > 1 {
+		emails = s.sortEmails(emails, req.SortField, req.SortDirection)
+	}
+
+	// 生成导出内容
+	content := s.generateExportContent(emails, req.Format)
+
+	// 记录导出日志
+	s.logRepo.LogEmail(userID, "export_emails", 0,
+		fmt.Sprintf("导出邮箱数据，范围: %s，格式: %s，数量: %d", req.Range, req.Format, len(emails)),
+		ipAddress, userAgent)
+
+	response := &models.ExportEmailResponse{
+		Content: content,
+		Count:   len(emails),
+		Format:  req.Format,
+	}
+
+	return response, nil
+}
+
+// generateExportContent 生成导出内容
+func (s *EmailService) generateExportContent(emails []models.Email, format string) string {
+	if len(emails) == 0 {
+		return ""
+	}
+
+	var content strings.Builder
+
+	if format == "csv" {
+		// CSV格式：添加头部
+		content.WriteString("邮箱地址,密码,RefreshToken,ClientID,备注,添加时间\n")
+
+		for _, email := range emails {
+			// CSV格式需要处理特殊字符和引号
+			content.WriteString(fmt.Sprintf(`"%s","%s","%s","%s","%s","%s"`,
+				s.escapeCSV(email.EmailAddress),
+				s.escapeCSV(email.Password),
+				s.escapeCSV(email.RefreshToken),
+				s.escapeCSV(email.ClientID),
+				s.escapeCSV(email.Remark),
+				email.CreatedAt.Format("2006-01-02 15:04:05"),
+			))
+			content.WriteString("\n")
+		}
+	} else {
+		// TXT格式：每行一个邮箱，使用----分隔
+		for _, email := range emails {
+			content.WriteString(fmt.Sprintf("%s----%s----%s----%s",
+				email.EmailAddress,
+				email.Password,
+				email.RefreshToken,
+				email.ClientID,
+			))
+			content.WriteString("\n")
+		}
+	}
+
+	return content.String()
+}
+
+// escapeCSV CSV字段转义处理
+func (s *EmailService) escapeCSV(field string) string {
+	// 如果字段包含引号，需要双引号转义
+	if strings.Contains(field, `"`) {
+		field = strings.ReplaceAll(field, `"`, `""`)
+	}
+	return field
+}
+
+// sortEmails 对邮箱列表进行排序
+func (s *EmailService) sortEmails(emails []models.Email, sortField, sortDirection string) []models.Email {
+	sort.Slice(emails, func(i, j int) bool {
+		var less bool
+
+		switch sortField {
+		case "email_address":
+			less = emails[i].EmailAddress < emails[j].EmailAddress
+		case "password":
+			less = emails[i].Password < emails[j].Password
+		case "refresh_token":
+			less = emails[i].RefreshToken < emails[j].RefreshToken
+		case "client_id":
+			less = emails[i].ClientID < emails[j].ClientID
+		case "created_at":
+			less = emails[i].CreatedAt.Before(emails[j].CreatedAt)
+		default:
+			// 默认按邮箱地址排序
+			less = emails[i].EmailAddress < emails[j].EmailAddress
+		}
+
+		if sortDirection == "desc" {
+			return !less
+		}
+		return less
+	})
+
+	return emails
 }
