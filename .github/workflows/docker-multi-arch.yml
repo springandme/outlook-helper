@@ -50,7 +50,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            springandme/outlook-helper
+            hliushi/outlook-helper
             ghcr.io/${{ github.repository }}
 
       - name: Build and push multi-architecture Docker images
