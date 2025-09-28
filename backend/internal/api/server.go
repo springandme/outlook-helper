@@ -133,6 +133,7 @@ func (s *Server) setupRouter() {
 				emails.POST("", s.handleAddEmail)
 				emails.POST("/batch", s.handleBatchAddEmails)
 				emails.POST("/import", s.handleImportEmails)
+				emails.POST("/export", s.handleExportEmails)
 				emails.DELETE("/batch", s.handleBatchDeleteEmails)
 				emails.POST("/batch-clear-inbox", s.handleBatchClearInbox)
 				emails.GET("/:id/latest", s.handleGetLatestMail)
@@ -1707,5 +1708,49 @@ func (s *Server) handleClearLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Message: "操作日志已清空",
+	})
+}
+
+// handleExportEmails 导出邮箱数据
+func (s *Server) handleExportEmails(c *gin.Context) {
+	userID, exists := auth.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Success: false,
+			Message: "未认证",
+			Error:   "user not authenticated",
+		})
+		return
+	}
+
+	var req models.ExportEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Message: "请求参数错误",
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	// 获取客户端信息
+	ipAddress := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+
+	// 调用邮件服务导出邮箱
+	response, err := s.emailService.ExportEmails(userID, &req, ipAddress, userAgent)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Message: "导出邮箱失败",
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("成功导出 %d 个邮箱", response.Count),
+		Data:    response,
 	})
 }

@@ -121,6 +121,22 @@ type TagEmailRequest struct {
 	TagID    int   `json:"tag_id" binding:"required"`
 }
 
+// ExportEmailRequest 导出邮箱请求
+type ExportEmailRequest struct {
+	Range         string `json:"range" binding:"required,oneof=all selected"`
+	Format        string `json:"format" binding:"required,oneof=txt csv"`
+	SortField     string `json:"sort_field" binding:"required"`
+	SortDirection string `json:"sort_direction" binding:"required,oneof=asc desc"`
+	EmailIDs      []int  `json:"email_ids,omitempty"`
+}
+
+// ExportEmailResponse 导出邮箱响应
+type ExportEmailResponse struct {
+	Content string `json:"content"`
+	Count   int    `json:"count"`
+	Format  string `json:"format"`
+}
+
 // APIResponse 通用API响应
 type APIResponse struct {
 	Success bool        `json:"success"`
