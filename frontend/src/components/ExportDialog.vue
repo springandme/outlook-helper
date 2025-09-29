@@ -35,15 +35,13 @@
             :animation="150"
             tag="div"
           >
-            <div
-              v-for="(element, index) in exportForm.fieldOrder"
-              :key="element.key"
-              class="field-item"
-            >
-              <el-icon class="drag-handle"><Rank /></el-icon>
-              <span class="field-label">{{ element.label }}</span>
-              <span class="field-position">{{ index + 1 }}</span>
-            </div>
+            <template #item="{ element, index }">
+              <div class="field-item">
+                <el-icon class="drag-handle"><Rank /></el-icon>
+                <span class="field-label">{{ element.label }}</span>
+                <span class="field-position">{{ index + 1 }}</span>
+              </div>
+            </template>
           </VueDraggable>
         </div>
       </el-form-item>
