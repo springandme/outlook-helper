@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     title="导出邮箱数据"
-    width="580px"
+    width="650px"
     :before-close="handleClose"
   >
     <el-form :model="exportForm" label-width="100px" class="export-form">
@@ -24,19 +24,28 @@
         </el-radio-group>
       </el-form-item>
 
-      <!-- 排序字段 -->
-      <el-form-item label="排序字段">
-        <el-select v-model="exportForm.sortField" style="width: 200px">
-          <el-option label="邮箱地址" value="email_address" />
-          <el-option label="密码" value="password" />
-          <el-option label="RefreshToken" value="refresh_token" />
-          <el-option label="ClientID" value="client_id" />
-          <el-option label="添加时间" value="created_at" />
-        </el-select>
-        <el-select v-model="exportForm.sortDirection" style="width: 120px; margin-left: 10px">
-          <el-option label="升序" value="asc" />
-          <el-option label="降序" value="desc" />
-        </el-select>
+      <!-- 字段顺序 -->
+      <el-form-item label="字段顺序">
+        <div class="field-order-container">
+          <div class="field-order-hint">拖拽调整字段顺序：</div>
+          <VueDraggable
+            v-model="exportForm.fieldOrder"
+            class="field-list"
+            item-key="key"
+            :animation="150"
+            tag="div"
+          >
+            <div
+              v-for="(element, index) in exportForm.fieldOrder"
+              :key="element.key"
+              class="field-item"
+            >
+              <el-icon class="drag-handle"><Rank /></el-icon>
+              <span class="field-label">{{ element.label }}</span>
+              <span class="field-position">{{ index + 1 }}</span>
+            </div>
+          </VueDraggable>
+        </div>
       </el-form-item>
 
       <!-- 预览格式 -->
@@ -70,7 +79,8 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
+import { Download, Rank } from '@element-plus/icons-vue'
+import VueDraggable from 'vuedraggable'
 
 // Props
 interface Props {
@@ -92,12 +102,18 @@ interface Emits {
 
 const emit = defineEmits<Emits>()
 
+// 字段定义接口
+interface FieldOption {
+  key: string
+  label: string
+  value: string
+}
+
 // 导出参数接口
 interface ExportParams {
   range: 'all' | 'selected'
   format: 'txt' | 'csv'
-  sortField: string
-  sortDirection: 'asc' | 'desc'
+  fieldOrder: FieldOption[]
   emailIds?: number[]
 }
 
@@ -109,26 +125,35 @@ const visible = computed({
 
 const exporting = ref(false)
 
+// 默认字段顺序
+const defaultFieldOrder: FieldOption[] = [
+  { key: 'email_address', label: '邮箱地址', value: 'email_address' },
+  { key: 'password', label: '密码', value: 'password' },
+  { key: 'refresh_token', label: 'RefreshToken', value: 'refresh_token' },
+  { key: 'client_id', label: 'ClientID', value: 'client_id' }
+]
+
 const exportForm = reactive<ExportParams>({
   range: 'all',
   format: 'txt',
-  sortField: 'email_address',
-  sortDirection: 'asc'
+  fieldOrder: [...defaultFieldOrder]
 })
 
 // 格式预览
 const formatPreview = computed(() => {
-  const sample = {
-    email: 'example@outlook.com',
+  const sampleData: Record<string, string> = {
+    email_address: 'example@outlook.com',
     password: 'password123',
-    refreshToken: 'refresh_token_here',
-    clientId: 'client_id_here'
+    refresh_token: 'refresh_token_here',
+    client_id: 'client_id_here'
   }
 
+  const orderedValues = exportForm.fieldOrder.map(field => sampleData[field.key])
+
   if (exportForm.format === 'txt') {
-    return `${sample.email}----${sample.password}----${sample.refreshToken}----${sample.clientId}`
+    return orderedValues.join('----')
   } else {
-    return `"${sample.email}","${sample.password}","${sample.refreshToken}","${sample.clientId}"`
+    return orderedValues.map(val => `"${val}"`).join(',')
   }
 })
 
@@ -151,8 +176,7 @@ const handleExport = async () => {
     const params: ExportParams = {
       range: exportForm.range,
       format: exportForm.format,
-      sortField: exportForm.sortField,
-      sortDirection: exportForm.sortDirection
+      fieldOrder: exportForm.fieldOrder
     }
 
     // 如果导出选中的邮箱，需要传递邮箱ID列表
@@ -177,8 +201,7 @@ const handleExport = async () => {
 const resetForm = () => {
   exportForm.range = 'all'
   exportForm.format = 'txt'
-  exportForm.sortField = 'email_address'
-  exportForm.sortDirection = 'asc'
+  exportForm.fieldOrder = [...defaultFieldOrder]
 }
 
 // 监听对话框打开，重置表单
@@ -229,6 +252,80 @@ watch(visible, (newVisible) => {
 .el-form-item__label {
   font-weight: 500;
   color: #303133;
+}
+
+/* 字段顺序相关样式 */
+.field-order-container {
+  width: 100%;
+}
+
+.field-order-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.field-list {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  background-color: #fafafa;
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.field-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  margin: 4px 0;
+  background-color: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  cursor: move;
+  transition: all 0.2s;
+}
+
+.field-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 4px rgba(64, 158, 255, 0.12);
+}
+
+.field-item.sortable-chosen {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+}
+
+.field-item.sortable-ghost {
+  opacity: 0.5;
+  background-color: #f0f9ff;
+}
+
+.drag-handle {
+  margin-right: 8px;
+  color: #909399;
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.field-label {
+  flex: 1;
+  font-size: 14px;
+  color: #303133;
+}
+
+.field-position {
+  background-color: #409eff;
+  color: #fff;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 20px;
+  text-align: center;
 }
 
 /* 响应式设计 */

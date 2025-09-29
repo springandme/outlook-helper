@@ -121,13 +121,19 @@ type TagEmailRequest struct {
 	TagID    int   `json:"tag_id" binding:"required"`
 }
 
+// FieldOption 字段选项
+type FieldOption struct {
+	Key   string `json:"key" binding:"required"`
+	Label string `json:"label" binding:"required"`
+	Value string `json:"value" binding:"required"`
+}
+
 // ExportEmailRequest 导出邮箱请求
 type ExportEmailRequest struct {
-	Range         string `json:"range" binding:"required,oneof=all selected"`
-	Format        string `json:"format" binding:"required,oneof=txt csv"`
-	SortField     string `json:"sort_field" binding:"required"`
-	SortDirection string `json:"sort_direction" binding:"required,oneof=asc desc"`
-	EmailIDs      []int  `json:"email_ids,omitempty"`
+	Range      string        `json:"range" binding:"required,oneof=all selected"`
+	Format     string        `json:"format" binding:"required,oneof=txt csv"`
+	FieldOrder []FieldOption `json:"field_order" binding:"required,dive"`
+	EmailIDs   []int         `json:"email_ids,omitempty"`
 }
 
 // ExportEmailResponse 导出邮箱响应

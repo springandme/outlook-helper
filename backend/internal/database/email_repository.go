@@ -447,32 +447,15 @@ func (r *EmailRepository) GetEmailsByIDs(userID int, emailIDs []int) ([]models.E
 	return emails, rows.Err()
 }
 
-// GetEmailsForExport 获取用于导出的邮箱数据（支持排序）
-func (r *EmailRepository) GetEmailsForExport(userID int, sortField, sortDirection string) ([]models.Email, error) {
-	// 验证排序字段
-	validSortFields := map[string]bool{
-		"email_address": true,
-		"password":      true,
-		"refresh_token": true,
-		"client_id":     true,
-		"created_at":    true,
-	}
-
-	if !validSortFields[sortField] {
-		sortField = "email_address" // 默认排序字段
-	}
-
-	// 验证排序方向
-	if sortDirection != "asc" && sortDirection != "desc" {
-		sortDirection = "asc" // 默认排序方向
-	}
-
+// GetAllEmailsByUserID 获取用户的所有邮箱（不分页，用于导出）
+func (r *EmailRepository) GetAllEmailsByUserID(userID int) ([]models.Email, error) {
 	query := `
 		SELECT id, user_id, email_address, password, client_id, refresh_token, remark,
 		       last_operation_at, created_at, updated_at
 		FROM emails
 		WHERE user_id = ?
-		ORDER BY ` + sortField + ` ` + sortDirection
+		ORDER BY created_at DESC
+	`
 
 	rows, err := r.db.Query(query, userID)
 	if err != nil {

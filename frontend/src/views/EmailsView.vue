@@ -342,8 +342,7 @@ const handleExport = async (params: any) => {
     const exportParams = {
       range: params.range,
       format: params.format,
-      sort_field: params.sortField,
-      sort_direction: params.sortDirection,
+      field_order: params.fieldOrder,
       email_ids: params.emailIds
     }
 
