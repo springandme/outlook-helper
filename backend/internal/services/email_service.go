@@ -3,7 +3,6 @@ package services
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"outlook-helper/backend/internal/config"
@@ -477,24 +476,24 @@ func (s *EmailService) ExportEmails(userID int, req *models.ExportEmailRequest, 
 			return nil, errors.New("部分邮箱不存在或无权访问")
 		}
 	} else {
-		// 导出全部邮箱
-		emails, err = s.emailRepo.GetEmailsForExport(userID, req.SortField, req.SortDirection)
+		// 导出全部邮箱 - 简化查询，不再需要排序参数
+		emails, err = s.emailRepo.GetAllEmailsByUserID(userID)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// 如果是选中的邮箱，需要根据排序字段和方向重新排序
-	if req.Range == "selected" && len(emails) > 1 {
-		emails = s.sortEmails(emails, req.SortField, req.SortDirection)
-	}
-
-	// 生成导出内容
-	content := s.generateExportContent(emails, req.Format)
+	// 生成导出内容，使用用户指定的字段顺序
+	content := s.generateExportContentWithFieldOrder(emails, req.Format, req.FieldOrder)
 
 	// 记录导出日志
+	fieldNames := make([]string, len(req.FieldOrder))
+	for i, field := range req.FieldOrder {
+		fieldNames[i] = field.Label
+	}
 	s.logRepo.LogEmail(userID, "export_emails", 0,
-		fmt.Sprintf("导出邮箱数据，范围: %s，格式: %s，数量: %d", req.Range, req.Format, len(emails)),
+		fmt.Sprintf("导出邮箱数据，范围: %s，格式: %s，字段顺序: [%s]，数量: %d",
+			req.Range, req.Format, strings.Join(fieldNames, ", "), len(emails)),
 		ipAddress, userAgent)
 
 	response := &models.ExportEmailResponse{
@@ -506,8 +505,8 @@ func (s *EmailService) ExportEmails(userID int, req *models.ExportEmailRequest, 
 	return response, nil
 }
 
-// generateExportContent 生成导出内容
-func (s *EmailService) generateExportContent(emails []models.Email, format string) string {
+// generateExportContentWithFieldOrder 根据字段顺序生成导出内容
+func (s *EmailService) generateExportContentWithFieldOrder(emails []models.Email, format string, fieldOrder []models.FieldOption) string {
 	if len(emails) == 0 {
 		return ""
 	}
@@ -516,34 +515,56 @@ func (s *EmailService) generateExportContent(emails []models.Email, format strin
 
 	if format == "csv" {
 		// CSV格式：添加头部
-		content.WriteString("邮箱地址,密码,RefreshToken,ClientID,备注,添加时间\n")
+		headers := make([]string, len(fieldOrder))
+		for i, field := range fieldOrder {
+			headers[i] = field.Label
+		}
+		content.WriteString(strings.Join(headers, ","))
+		content.WriteString("\n")
 
+		// 添加数据行
 		for _, email := range emails {
-			// CSV格式需要处理特殊字符和引号
-			content.WriteString(fmt.Sprintf(`"%s","%s","%s","%s","%s","%s"`,
-				s.escapeCSV(email.EmailAddress),
-				s.escapeCSV(email.Password),
-				s.escapeCSV(email.RefreshToken),
-				s.escapeCSV(email.ClientID),
-				s.escapeCSV(email.Remark),
-				email.CreatedAt.Format("2006-01-02 15:04:05"),
-			))
+			values := make([]string, len(fieldOrder))
+			for i, field := range fieldOrder {
+				value := s.getEmailFieldValue(email, field.Key)
+				values[i] = fmt.Sprintf(`"%s"`, s.escapeCSV(value))
+			}
+			content.WriteString(strings.Join(values, ","))
 			content.WriteString("\n")
 		}
 	} else {
 		// TXT格式：每行一个邮箱，使用----分隔
 		for _, email := range emails {
-			content.WriteString(fmt.Sprintf("%s----%s----%s----%s",
-				email.EmailAddress,
-				email.Password,
-				email.RefreshToken,
-				email.ClientID,
-			))
+			values := make([]string, len(fieldOrder))
+			for i, field := range fieldOrder {
+				values[i] = s.getEmailFieldValue(email, field.Key)
+			}
+			content.WriteString(strings.Join(values, "----"))
 			content.WriteString("\n")
 		}
 	}
 
 	return content.String()
+}
+
+// getEmailFieldValue 根据字段键获取邮箱对应的字段值
+func (s *EmailService) getEmailFieldValue(email models.Email, fieldKey string) string {
+	switch fieldKey {
+	case "email_address":
+		return email.EmailAddress
+	case "password":
+		return email.Password
+	case "refresh_token":
+		return email.RefreshToken
+	case "client_id":
+		return email.ClientID
+	case "remark":
+		return email.Remark
+	case "created_at":
+		return email.CreatedAt.Format("2006-01-02 15:04:05")
+	default:
+		return ""
+	}
 }
 
 // escapeCSV CSV字段转义处理
@@ -555,32 +576,3 @@ func (s *EmailService) escapeCSV(field string) string {
 	return field
 }
 
-// sortEmails 对邮箱列表进行排序
-func (s *EmailService) sortEmails(emails []models.Email, sortField, sortDirection string) []models.Email {
-	sort.Slice(emails, func(i, j int) bool {
-		var less bool
-
-		switch sortField {
-		case "email_address":
-			less = emails[i].EmailAddress < emails[j].EmailAddress
-		case "password":
-			less = emails[i].Password < emails[j].Password
-		case "refresh_token":
-			less = emails[i].RefreshToken < emails[j].RefreshToken
-		case "client_id":
-			less = emails[i].ClientID < emails[j].ClientID
-		case "created_at":
-			less = emails[i].CreatedAt.Before(emails[j].CreatedAt)
-		default:
-			// 默认按邮箱地址排序
-			less = emails[i].EmailAddress < emails[j].EmailAddress
-		}
-
-		if sortDirection == "desc" {
-			return !less
-		}
-		return less
-	})
-
-	return emails
-}

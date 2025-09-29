@@ -129,11 +129,16 @@ export interface TagEmailRequest {
 }
 
 // 导出相关类型
+export interface FieldOption {
+  key: string
+  label: string
+  value: string
+}
+
 export interface ExportEmailRequest {
   range: 'all' | 'selected'
   format: 'txt' | 'csv'
-  sort_field: string
-  sort_direction: 'asc' | 'desc'
+  field_order: FieldOption[]
   email_ids?: number[]
 }
 
